@@ -36,6 +36,7 @@ import { WalletStore } from '@/lib/WalletStore';
 import staticStore, { Static } from '@/lib/StaticStore';
 import { PageHeader, PageBody, LabelInput, AccountList, PageFooter, SmallPage } from '@nimiq/vue-components';
 import Network from '@/components/Network.vue';
+import { ContractInfo, VestingContractInfo } from '@/lib/ContractInfo';
 
 @Component({components: {PageHeader, PageBody, LabelInput, AccountList, Network, PageFooter, SmallPage}})
 export default class LoginSuccess extends Vue {
@@ -59,6 +60,7 @@ export default class LoginSuccess extends Vue {
      * triggers the recomputation, which in turn updates the DOM.
      */
     private accounts: Map<string, AccountInfo> = new Map();
+    private contracts: ContractInfo[] = [];
     private accountsUpdateCount: number = 0;
 
     private lastDerivedIndex: number = 0;
@@ -114,6 +116,13 @@ export default class LoginSuccess extends Vue {
 
             // Kick off account detection
             this.findAccounts();
+        }
+
+        if (this.keyguardResult.keyType === WalletType.LEGACY) {
+            // Search GenesisBlock for vesting contracts owned by imported account
+            const myAddress = this.accounts.values().next().value.address;
+            this.contracts = this.getGenesisVestingContracts()
+                .filter(contract => contract.owner.equals(myAddress));
         }
     }
 
@@ -198,7 +207,7 @@ export default class LoginSuccess extends Vue {
             this.keyguardResult.keyId,
             this.walletLabel,
             this.accounts,
-            [],
+            this.contracts,
             this.keyguardResult.keyType,
         );
 
@@ -212,6 +221,7 @@ export default class LoginSuccess extends Vue {
                 address: addressInfo.userFriendlyAddress,
                 label: addressInfo.label,
             })),
+            contracts: [],
         };
     }
 
@@ -221,12 +231,40 @@ export default class LoginSuccess extends Vue {
         this.$rpc.resolve(this.result);
     }
 
+    private getGenesisVestingContracts(): VestingContractInfo[] {
+        const contracts: VestingContractInfo[] = [];
+        const buf = Nimiq.BufferUtils.fromBase64(Nimiq.GenesisConfig.GENESIS_ACCOUNTS);
+        const count = buf.readUint16();
+        for (let i = 0; i < count; i++) {
+            const address = Nimiq.Address.unserialize(buf);
+            const account = Nimiq.Account.unserialize(buf);
+
+            if (account.type === Nimiq.Account.Type.VESTING) {
+                const contract = account as Nimiq.VestingContract;
+                contracts.push(new VestingContractInfo(
+                    'Vesting Contract',
+                    address,
+                    contract.owner,
+                    contract.vestingStart,
+                    contract.vestingStepAmount,
+                    contract.vestingStepBlocks,
+                    contract.vestingTotalAmount,
+                    // contract.balance,
+                ));
+            }
+        }
+        return contracts;
+    }
+
     private get walletIconClass(): string {
         return this.keyguardResult.keyType === WalletType.LEDGER ? 'ledger' : 'keyguard';
     }
 
-    private get accountsArray(): Array<{ label: string, address: Nimiq.Address, balance?: number }> {
-        if (this.accountsUpdateCount) return Array.from(this.accounts.values());
+    private get accountsArray(): Array<{ label: string, userFriendlyAddress: string, balance?: number }> {
+        if (this.accountsUpdateCount) return Array.from(this.accounts.values()).map(account => ({
+            label: account.label,
+            userFriendlyAddress: account.userFriendlyAddress,
+        }));
         return [];
     }
 

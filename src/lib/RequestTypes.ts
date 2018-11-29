@@ -156,6 +156,11 @@ export interface LoginResult {
         address: string;
         label: string;
     }>;
+    contracts: Array<{
+        address: string;
+        label: string;
+        // ...
+    }>;
 }
 
 export interface ExportRequest {
