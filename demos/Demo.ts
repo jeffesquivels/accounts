@@ -29,7 +29,7 @@ class Demo {
 
         const demo = new Demo(`${location.protocol}//${location.hostname}:8000`);
 
-        const client = new AccountsClient(`${location.protocol}//${location.host}`);
+        const client = new AccountsClient(location.origin);
         client.on(RequestType.CHECKOUT, (result: SignTransactionResult, state: Rpc.State) => {
             console.log('AccountsManager result', result);
             console.log('State', state);

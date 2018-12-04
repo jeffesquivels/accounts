@@ -6,13 +6,14 @@
 </template>
 
 <script lang="ts">
-import { Component, Emit, Prop, Watch, Vue } from 'vue-property-decorator';
-import { SignTransactionResult, SignTransactionRequest } from '../lib/RequestTypes';
+import { Component, Prop, Vue } from 'vue-property-decorator';
+import { SignTransactionResult } from '../lib/RequestTypes';
 import {
     SignTransactionRequest as KSignTransactionRequest,
     SignTransactionResult as KSignTransactionResult,
 } from '@nimiq/keyguard-client';
-import { NetworkClient, PlainTransaction } from '@nimiq/network-client';
+import { NetworkClient } from '@nimiq/network-client';
+import LazyLoading from '../lib/LazyLoading';
 
 @Component
 export default class Network extends Vue {
@@ -35,7 +36,7 @@ export default class Network extends Vue {
         keyguardRequest: KSignTransactionRequest,
         keyguardResult: KSignTransactionResult,
     ): Promise<Nimiq.Transaction> {
-        await this._loadNimiq();
+        await LazyLoading.loadNimiq(true);
 
         let tx: Nimiq.Transaction;
 
@@ -162,17 +163,6 @@ export default class Network extends Vue {
         this._networkClient.on('nimiq-peer-count', (count: number) => this.$emit('peer-count', count));
 
         return this._networkClient;
-    }
-
-    private async _loadNimiq() {
-        try {
-            // Load web assembly encryption library into browser (if supported)
-            await Nimiq.WasmHelper.doImportBrowser();
-            // Configure to use test net for now
-            Nimiq.GenesisConfig.test();
-        } catch (e) {
-            console.error(e);
-        }
     }
 
     private get status(): string {
